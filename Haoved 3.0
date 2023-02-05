@@ -1,0 +1,210 @@
+from mindstorms import MSHub, Motor, MotorPair, ColorSensor, DistanceSensor, App
+from mindstorms.control import wait_for_seconds, wait_until, Timer
+from mindstorms.operator import greater_than, greater_than_or_equal_to, less_than, less_than_or_equal_to, equal_to, \
+    not_equal_to
+import math
+
+# Create your objects here.
+hub = MSHub()
+# Here we create our objcts like lazoz or tzeva.
+
+lazoz = MotorPair('D', 'A')
+yamin = Motor('A')
+right = Motor('C')
+left = Motor('B')
+tzeva = ColorSensor('F')
+coulor = ColorSensor('E')
+gyro = hub.motion_sensor.get_yaw_angle()
+gyro_reset = hub.motion_sensor.reset_yaw_angle()
+wheel_diemter = 6
+wheel_distance = 11
+half_width = wheel_distance / 2
+
+
+# Here we write our methods like line follow or straight gyro
+def line_follow(speed, target_distance):
+    yamin.set_degrees_counted(0)
+    lazoz.set_default_speed(speed)
+    # the while loop checks if the robot have more distance to travel it doesn't that by checking the degrees that the
+    # encoder counts and if it's less than the target distance multiplied by 22 than he will keep moving
+    while yamin.get_degrees_counted() < (target_distance * 22):
+        # tells the robot to move by the intensity of the reflected light >>>
+        lazoz.start(int((tzeva.get_reflected_light() - 50) * 2))
+
+    lazoz.stop()
+
+
+def turn(angle, speed=1, clockwise=True):
+    init_angle = hub.motion_sensor.get_yaw_angle()
+    curr_angle = init_angle
+    if angle > 180 or angle < -180:
+        print('//error error mast die angle cant be > than 180//')
+    else:
+        if clockwise:
+            if init_angle >= 0 and init_angle + angle > 180:
+                # print ("cc|turn-2")
+                lazoz.set_stop_action('hold')
+                lazoz.start_tank(abs(speed), -1 * abs(speed))
+                while (curr_angle >= 0 or 180 - init_angle + 180 + curr_angle < angle):
+                    state = 180 - init_angle
+                    curr_angle = hub.motion_sensor.get_yaw_angle()
+                   # print (curr_angle)
+                lazoz.stop()
+            else:
+                # print ("cc|turn-1")
+                lazoz.set_stop_action('hold')
+                lazoz.start_tank(abs(speed), -1 * abs(speed))
+                while abs(curr_angle - init_angle) <= angle:
+                    # print (curr_angle)
+                    curr_angle = hub.motion_sensor.get_yaw_angle()
+                lazoz.stop()
+        else:
+            if init_angle < 0 and init_angle + angle > 180:
+                # print ("ccw|turn-2")
+                lazoz.set_stop_action('hold')
+                lazoz.start_tank(abs(speed) * -1, abs(speed))
+                while (curr_angle < 0 or (-180 - init_angle) + (180 + curr_angle)) < angle:
+                    curr_angle = hub.motion_sensor.get_yaw_angle()
+                    # print (curr_angle)
+                lazoz.stop()
+            else:
+                # print ("ccw|turn-1")
+                lazoz.set_stop_action('hold')
+                lazoz.start_tank(abs(speed) * -1, abs(speed))
+                while abs(init_angle - curr_angle < angle):
+                    curr_angle = hub.motion_sensor.get_yaw_angle()
+                   # print (curr_angle)
+                lazoz.stop()
+
+
+def straight_gyro(speed, distance):
+    yamin.set_degrees_counted(0)
+    init_angle = hub.motion_sensor.get_yaw_angle()
+    KP = 1.4
+    while abs(yamin.get_degrees_counted()) < (distance * 22):
+        # we use the error to come back to the driving angle than we multiplied it with KP for correction >>>
+        driving_error = (init_angle - hub.motion_sensor.get_yaw_angle()) * KP
+        # the robot starts moving error and speed >>>
+        lazoz.start(int(driving_error), int(speed))
+    lazoz.stop()
+
+
+def long_drive(speed, distance, time):
+    timer = Timer()
+    yamin.set_degrees_counted(0)
+    init_angle = hub.motion_sensor.get_yaw_angle()
+    KP = 1.4
+    while abs(yamin.get_degrees_counted()) < (distance * 22):
+
+        # we use the error to come back to the driving angle than we multiplied it with KP for correction >>>
+        while timer.now() < time:
+            speed_new = abs(speed / time * timer.now())
+            print (timer.now())
+        driving_error = (init_angle - hub.motion_sensor.get_yaw_angle() * KP)
+        # the robot starts moving error and speed >>>
+        lazoz.start(int(driving_error), int(speed_new))
+        print ("driving_error: " + str(driving_error) + "speed: " + str(speed_new))
+    
+    lazoz.stop()
+
+
+def straight_gyro_time(speed, time, angle):
+    timer.reset()
+    KP = 1.4
+    # time works on the same idea as distance, but it works if the timer is less than time and not if distance is less
+    # than time >>>
+    while timer.now() < time:
+        steering = (angle - gyro) * KP
+        lazoz.start(int(steering), int(speed))
+    lazoz.stop()
+
+
+def color_sensor():
+    # return from both sensors black
+    return coulor.get_reflected_light() <= 20, tzeva.get_reflected_light() <= 20
+
+
+def line_squaring(speed):
+    lazoz.start(0, speed)
+    # wait until color sensor return black
+    wait_until(color_sensor)
+    # if it's equal to black he will stop or in ths case he slows down to -7 >>>
+    if coulor.get_reflected_light() <= 20:
+        lazoz.start(-7, speed)
+        wait_until(tzeva.get_color(), equal_to, 'black')
+        lazoz.stop()
+    # else refring here to the second color sensor
+    else:
+        lazoz.start_tank(speed, -7)
+        wait_until(coulor.get_color(), equal_to, 'black')
+        lazoz.stop()
+
+
+
+# this is the start of the red run
+while True:
+    hub.light_matrix.show_image('DUCK')
+
+    if hub.right_button.is_pressed():
+        # Red run start
+        long_drive(40, 19, 2)
+        straight_gyro(-60, 8)
+        turn(38, 5, False)
+        long_drive(60, 22, 4)
+        turn(65, 7)
+        straight_gyro(-60, 8)
+        lazoz.move_tank(1, 'cm', 10, -10)
+        straight_gyro(60, 16)
+        wait_for_seconds(0.8)
+        for x in range(3):
+            straight_gyro(-40, 4)
+            wait_for_seconds(0.3)
+            straight_gyro(60, 4)
+            wait_for_seconds(0.7)
+        lazoz.move_tank(0.5, 'cm', 10, -10)
+        # Red run stop
+        
+        # Purple run start
+        hub.right_button.wait_until_pressed()
+        turn(23, 2)
+        wait_for_seconds(0.3)
+        straight_gyro(60, 37)
+        turn(29)
+        straight_gyro(-60, 4)
+        wait_for_seconds(0.3)
+        lazoz.move_tank(2.7, 'cm', 10, -10)
+        straight_gyro(45, 10)
+        left.run_for_seconds(1)
+        wait_for_seconds(0.5)
+        straight_gyro(-60, 8.5)
+        turn(90)
+        straight_gyro(60, 2)
+        turn(8)
+        straight_gyro(60, 26)
+        turn(60)
+        straight_gyro(-60, 45)
+        # Purple run stop
+        
+    elif hub.left_button.is_pressed():
+        straight_gyro(60, 5)
+        turn(27, 5)
+        straight_gyro(30, 5)
+        line_follow(60, 18)
+        turn(24, 5, False)
+        wait_for_seconds(0.3)
+        straight_gyro(60, 9)
+        for x in range(3):
+            straight_gyro(30, 5)
+            wait_for_seconds(0.3)
+            straight_gyro(-30, 5)
+        # right.run_for_seconds(1)
+        hub.left_button.wait_until_pressed()
+        straight_gyro(50, 30)
+        straight_gyro(-80, 50)
+        hub.left_button.wait_until_pressed()
+        straight_gyro(50, 21)
+        lazoz.move_tank(1, 'cm', 50, -50)
+        lazoz.move_tank(1, 'cm', -50, 50)
+        straight_gyro(-30, 24)
+        hub.left_button.wait_until_pressed()
+        straight_gyro(60, 90)
