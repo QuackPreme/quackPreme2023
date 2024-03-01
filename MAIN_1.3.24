@@ -1,0 +1,179 @@
+
+from hub import light_matrix, motion_sensor, port, button, light
+import runloop ,motor_pair,motor, hub, device, color_sensor, color
+
+motor_pair.unpair(1)
+motor_pair.pair(1,port.B,port.E)
+soferDegrees=0
+async def main():
+    # write your code here
+    motion_sensor.reset_yaw(0)
+    def closest(angle,wheelsOrGyro=True): #code
+        goTo=0
+        if wheelsOrGyro:
+            goTo_1=angle-((motion_sensor.tilt_angles()[0]/10)%360)
+            goTo_2=(angle-((motion_sensor.tilt_angles()[0]/10)%360))+360
+            goTo_3=(angle-((motion_sensor.tilt_angles()[0]/10)%360))- 360
+            if abs(goTo_1)<abs(goTo_2) and abs(goTo_1)<abs(goTo_3):
+                goTo=goTo_1
+            elif abs(goTo_2)<abs(goTo_1) and abs(goTo_2)<abs(goTo_3):
+                goTo=goTo_2
+            elif abs(goTo_3)<abs(goTo_1) and abs(goTo_3)<abs(goTo_2):
+                goTo=goTo_3
+        else:
+            goTo_1=angle-(motor.absolute_position(port.C)%360)
+            goTo_2=(angle-(motor.absolute_position(port.C)%360))+360
+            goTo_3=(angle-(motor.absolute_position(port.C)%360))- 360
+            if abs(goTo_1)<abs(goTo_2) and abs(goTo_1)<abs(goTo_3):
+                goTo=goTo_1
+            elif abs(goTo_2)<abs(goTo_1) and abs(goTo_2)<abs(goTo_3):
+                goTo=goTo_2
+            elif abs(goTo_3)<abs(goTo_1) and abs(goTo_3)<abs(goTo_2):
+                goTo=goTo_3
+        return int(goTo)
+
+    def eatza(time):
+        speed=(abs(motor.relative_position(port.F)*28)/(time*time))
+        return speed
+
+    async def larotz(distance, speed, mekadem=4): #more code
+        motor.reset_relative_position(port.E,0)
+        KP=1.4
+        KI=1.1
+        PD=1.00312
+        x=1
+        newSpeed=36
+        motion_sensor.reset_yaw(0)
+        tspeed=int(speed*mekadem)
+        while abs(motor.relative_position(port.E))<abs(distance)*28:
+            if newSpeed<tspeed:
+                newSpeed+=int(eatza(x))
+                x+=1
+            elif newSpeed>=tspeed:
+                newSpeed=tspeed
+            error=int(((0-(motion_sensor.tilt_angles()[0]/10)*KP)*KI)*PD)
+            motor_pair.move_tank(1,newSpeed-(error),newSpeed+error,acceleration=1000)
+        motor_pair.stop(1,stop=motor.SMART_BRAKE)
+
+    async def turnMhalot(angle,speed): # od code
+        global soferDegrees
+        motion_sensor.reset_yaw(0)
+        tspeed = int(speed*3.6)
+        while abs(motion_sensor.tilt_angles()[0])<=angle*10:
+            motor_pair.move_tank(1,tspeed,tspeed*-1)
+        soferDegrees+=(angle*(speed/abs(speed)))
+        motor_pair.stop(1,stop=motor.BRAKE)
+
+    async def keshet(distance, speed,a):
+        motor.reset_relative_position(port.E,0)
+        wheelSpeed=int(speed*6.6)
+        keshetSpeed=0
+        while abs(motor.relative_position(port.E))<distance*28:
+            while abs(wheelSpeed)>abs(keshetSpeed):
+                keshetSpeed= int(a*(motor.relative_position(port.F)*motor.relative_position(port.F)))
+            if wheelSpeed>0:
+                motor_pair.move_tank(1,wheelSpeed,wheelSpeed+keshetSpeed)
+            else:
+                motor_pair.move_tank(1,-1*wheelSpeed+keshetSpeed,-1*wheelSpeed)
+        motor_pair.stop(1, stop=motor.BRAKE)
+
+    async def larotzTov(distance, speed): #more code aval chadash
+        motor.reset_relative_position(port.E,0)
+        KP=1.4
+        KI=1.1
+        PD=1.00312
+        tspeed=int(speed*6.6)
+        while abs(motor.relative_position(port.E))<distance*28:
+            error=int(((soferDegrees-(motion_sensor.tilt_angles()[0]/10)*KP)*KI)*PD)
+            motor_pair.move_tank(1,tspeed-(error),tspeed+error,acceleration=600)
+        motor_pair.stop(1,stop=motor.SMART_BRAKE)
+        
+    #ירוק
+    '''await larotz(30,70)7
+    await larotz(30,-100)'''
+    # אתחלה של ההארצה האדומה
+    while True:
+        if color_sensor.color(port.C) == 9:
+            light.color(light.POWER,color.RED)
+            if button.pressed(button.LEFT)==1:
+                await larotz(11,100)
+                await turnMhalot(50,-40)
+                await larotz(12,100)
+                await larotz(3,40)
+                await turnMhalot(85,20)
+                await larotz(12,100)
+                motor.run_for_degrees(port.A,500,-1000)
+                await larotz(8,-100)
+                await motor.run_for_degrees(port.A,400,1000)
+                await turnMhalot(28,-100)
+                await larotz(30,-165) #הסוף של ההאדום
+        #כחול
+        if color_sensor.color(port.C) is color.AZURE:
+            light.color(light.POWER,color.AZURE)
+            if button.pressed(button.LEFT)==1:
+                await motor.run_for_degrees(port.A,200,-1100)
+                await larotz(37,165)
+                await turnMhalot(45,30)
+                await larotz(4,40)
+                motor_pair.move_tank(1,25,25)
+                await runloop.sleep_ms(200)
+                await motor.run_for_degrees(port.F,880,-1100)
+                motor_pair.stop(1,stop=motor.BRAKE)
+                await larotz(6,-70)
+                await turnMhalot(48, -40)
+                await larotz(20,165)
+                await turnMhalot(21,-100)
+                await larotz(11,165)
+                await motor.run_for_degrees(port.A,200,1100)
+                await turnMhalot(30,-100)
+ 
+        if color_sensor.color(port.C) == 1:
+            light.color(light.POWER,color.PURPLE)
+            if button.pressed(button.LEFT)==1:
+                await larotzTov(49,100)
+                await runloop.sleep_ms(250)
+                #await motor.run_for_degrees(port.F,400,1100 )
+                await larotz(7,-65)
+                #motor.run_for_degrees(port.F,200,1100 )
+                await turnMhalot(40,30)
+                await larotz(11,70)
+                await motor.run_for_degrees(port.F,250,-650)
+                await turnMhalot(15,-40)
+                motor.run_for_degrees(port.F,189,650)
+                await turnMhalot(20,40)
+                await larotz(6,-100)
+                await turnMhalot(150,-40) 
+                motor.run_for_degrees(port.F,200,-1100 )               
+                await larotz(11,160)
+                await turnMhalot(90,30)
+                await larotz(6,45)
+                await motor.run_for_degrees(port.F,250,1100)
+                await larotz(4,-100)
+                await turnMhalot(87,30)
+                await larotz(10,100)
+                await keshet(20,-100,0.08)
+                await larotz(17,165)
+
+
+
+        #וורוד
+        if color_sensor.color(port.C) is color.WHITE:
+            light.color(light.POWER,color.BLACK)
+            if button.pressed(button.LEFT)==1:
+                await larotz(22,165)
+                await motor.run_for_degrees(port.A,300,1100)
+                await larotz(6,73)
+                await motor.run_for_degrees(port.F,4500,-1100)
+                await larotz(2,20)
+                await larotz(30,-165)#סוף וורוד
+            # וורוד ב
+    '''await larotz(47,100,6)
+    await turnMhalot(9,-30)
+    await larotz(6.8,-100,6)
+    await turnMhalot(48,30)'''
+
+
+
+
+
+runloop.run(main())
